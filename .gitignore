@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+instance/ponto.db
+instance/uploads/
+instance/logo/
+.venv/
+*.egg-info/
+dist/
+.pytest_cache/
+docs/superpowers/
+.idea/
