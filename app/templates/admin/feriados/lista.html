@@ -1,0 +1,73 @@
+{% extends "base_admin.html" %}
+{% block title %}Feriados{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold text-slate-800 mb-6">Feriados</h1>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <!-- Form to add holiday -->
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+    <h2 class="text-lg font-semibold text-slate-700 mb-4">Cadastrar Feriado</h2>
+    <form method="POST" action="{{ url_for('admin.novo_feriado') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="mb-3">
+        <label class="block text-sm font-medium text-slate-700 mb-1">Data *</label>
+        <input type="date" name="data" required
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div class="mb-3">
+        <label class="block text-sm font-medium text-slate-700 mb-1">Descrição *</label>
+        <input type="text" name="descricao" required placeholder="Ex: Natal"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div class="mb-4 flex items-center gap-2">
+        <input type="checkbox" name="recorrente_anual" id="recorrente" class="rounded">
+        <label for="recorrente" class="text-sm text-slate-700">Recorrente anualmente (ex: feriados nacionais fixos)</label>
+      </div>
+      <button type="submit"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition">
+        Cadastrar Feriado
+      </button>
+    </form>
+  </div>
+
+  <!-- Holiday list -->
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-100">
+      <h2 class="text-lg font-semibold text-slate-700">Feriados Cadastrados</h2>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="text-xs text-slate-500 uppercase bg-slate-50">
+        <tr>
+          <th class="px-6 py-3 text-left">Data</th>
+          <th class="px-6 py-3 text-left">Descrição</th>
+          <th class="px-6 py-3 text-left">Recorrente</th>
+          <th class="px-6 py-3 text-left">Ações</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for f in feriados %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-6 py-3 font-mono">{{ f.data.strftime('%d/%m/%Y') }}</td>
+          <td class="px-6 py-3">{{ f.descricao }}</td>
+          <td class="px-6 py-3">
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium
+              {{ 'bg-green-100 text-green-800' if f.recorrente_anual else 'bg-slate-100 text-slate-600' }}">
+              {{ 'Sim' if f.recorrente_anual else 'Não' }}
+            </span>
+          </td>
+          <td class="px-6 py-3">
+            <form method="POST" action="{{ url_for('admin.excluir_feriado', feriado_id=f.id) }}" class="inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="text-red-600 hover:underline text-xs"
+                data-confirm="Remover feriado {{ f.descricao }}?">Remover</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="px-6 py-4 text-center text-slate-400">Nenhum feriado cadastrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
