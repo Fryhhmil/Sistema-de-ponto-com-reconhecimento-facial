@@ -1,0 +1,17 @@
+{% extends "base_public.html" %}
+{% block title %}Política de Privacidade{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto py-16 px-6">
+  <a href="{{ url_for('public.index') }}" class="text-blue-300 text-sm mb-6 inline-block hover:underline">← Voltar</a>
+  <h1 class="text-3xl font-bold mb-6">Política de Privacidade e Tratamento de Dados Biométricos</h1>
+  <div class="space-y-4 text-blue-100 text-sm leading-relaxed">
+    <p><strong>Controladora:</strong> {{ cfg.nome_empresa or 'A empresa' }}</p>
+    <p><strong>Finalidade:</strong> O reconhecimento facial é utilizado exclusivamente para o controle de ponto eletrônico dos funcionários, conforme autorizado pelo contrato de trabalho.</p>
+    <p><strong>Base legal:</strong> Cumprimento de obrigação legal (CLT, art. 74 §2º) e legítimo interesse do empregador na gestão da jornada de trabalho (Lei nº 13.709/2018 — LGPD, art. 7º, II e IX).</p>
+    <p><strong>Dados coletados:</strong> Encoding facial (vetor matemático de 128 dimensões derivado da imagem do rosto). A imagem original não é armazenada permanentemente salvo quando configurado explicitamente.</p>
+    <p><strong>Retenção:</strong> Os dados biométricos são mantidos pelo período da relação de emprego e pelo prazo legal subsequente de guarda de documentos trabalhistas (5 anos após o término do contrato).</p>
+    <p><strong>Acesso:</strong> Apenas o setor de RH e administradores do sistema têm acesso aos dados.</p>
+    <p><strong>Direitos do titular:</strong> Você tem direito à confirmação, acesso, correção e exclusão dos seus dados. Entre em contato com o setor de RH para exercer esses direitos.</p>
+  </div>
+</div>
+{% endblock %}

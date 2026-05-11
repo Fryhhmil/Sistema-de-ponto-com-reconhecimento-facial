@@ -1,0 +1,25 @@
+{% extends "base_public.html" %}
+{% block title %}{{ cfg.nome_empresa or 'Ponto Digital' }}{% endblock %}
+{% block content %}
+<div class="min-h-screen flex flex-col items-center justify-center px-4">
+  {% if cfg.logo_empresa %}
+    <img src="{{ url_for('static', filename=cfg.logo_empresa) }}" class="h-20 mb-4" alt="Logo">
+  {% endif %}
+  <h1 class="text-4xl font-bold text-white mb-2">{{ cfg.nome_empresa or 'Ponto Digital' }}</h1>
+  <p id="relogio" class="text-7xl font-mono font-bold text-blue-200 my-8 tabular-nums"></p>
+  <div class="flex flex-col gap-5 w-full max-w-sm mt-4">
+    <a href="{{ url_for('public.ponto') }}"
+      class="block text-center bg-white text-blue-900 text-2xl font-bold py-6 rounded-2xl shadow-lg hover:bg-blue-50 transition active:scale-95">
+      REGISTRAR PONTO
+    </a>
+    <a href="{{ url_for('public.consulta') }}"
+      class="block text-center border-2 border-white text-white text-xl font-semibold py-5 rounded-2xl hover:bg-blue-800 transition active:scale-95">
+      CONSULTAR MEUS DADOS
+    </a>
+  </div>
+  <p class="mt-12 text-xs text-blue-400 text-center max-w-sm">
+    Esta empresa utiliza reconhecimento facial para registro de ponto.
+    Dados biométricos tratados conforme a <a href="{{ url_for('public.privacidade') }}" class="underline">LGPD</a>.
+  </p>
+</div>
+{% endblock %}
