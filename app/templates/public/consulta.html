@@ -1,0 +1,146 @@
+{% extends "base_public.html" %}
+{% block title %}Consultar Dados{% endblock %}
+{% block content %}
+<div class="min-h-screen flex flex-col items-center justify-center px-4 py-8">
+
+  <!-- Etapa 1: câmera de reconhecimento -->
+  <div id="etapaCamera" class="bg-blue-800 rounded-3xl p-8 w-full max-w-lg shadow-2xl">
+    <a href="{{ url_for('public.index') }}" class="text-blue-300 text-sm hover:underline mb-4 inline-block">← Voltar</a>
+    <h2 class="text-2xl font-bold text-center mb-6">Consultar Meus Dados</h2>
+    <div class="relative">
+      <video id="videoFeed" autoplay playsinline muted
+        class="w-full rounded-2xl bg-black" style="max-height:320px;object-fit:cover;"></video>
+      <div class="face-oval"></div>
+    </div>
+    <p class="text-center text-blue-200 text-sm mt-3">Posicione seu rosto e clique em IDENTIFICAR</p>
+    <p id="msgReconhecimento" class="text-center mt-2 text-lg min-h-6"></p>
+    <button id="btnCapturar" onclick="identificarConsulta()"
+      class="mt-5 w-full bg-white text-blue-900 font-bold text-xl py-4 rounded-xl hover:bg-blue-50 transition">
+      IDENTIFICAR
+    </button>
+  </div>
+
+  <!-- Etapa 2: dashboard pessoal (oculto inicialmente) -->
+  <div id="etapaDashboard" class="hidden w-full max-w-5xl">
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+      <div class="flex items-center gap-4">
+        <img id="fotoPerfil" class="w-16 h-16 rounded-full object-cover border-4 border-white" src="" alt="">
+        <div>
+          <h2 id="nomeFuncionario" class="text-2xl font-bold"></h2>
+          <p id="cargoFuncionario" class="text-blue-300 text-sm"></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <select id="seletorMes" onchange="carregarDados()"
+          class="bg-blue-800 border border-blue-600 rounded-lg px-3 py-2 text-white text-sm">
+          {% set meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] %}
+          {% for nome_mes in meses %}
+            <option value="{{ loop.index }}">{{ nome_mes }}</option>
+          {% endfor %}
+        </select>
+        <button onclick="sair()"
+          class="border border-blue-400 text-blue-300 hover:bg-blue-800 px-4 py-2 rounded-lg text-sm transition">
+          Sair
+        </button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      {% for card_id, label in [('cardTrabalhado','Horas Trabalhadas'),('cardSaldo','Saldo'),('cardAtrasos','Atrasos'),('cardFaltas','Faltas')] %}
+      <div class="bg-blue-800 rounded-xl p-4 text-center">
+        <p class="text-blue-300 text-xs uppercase tracking-wide mb-1">{{ label }}</p>
+        <p id="{{ card_id }}" class="text-2xl font-bold">—</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="bg-blue-800 rounded-xl overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-blue-900 text-blue-300 uppercase text-xs">
+          <tr>
+            {% for col in ['Data','Dia','Entrada','Saída','Horas','Saldo','Status'] %}
+            <th class="px-4 py-3 text-left whitespace-nowrap">{{ col }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody id="tabelaPontos" class="divide-y divide-blue-700"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/webcam.js') }}"></script>
+<script>
+const STATUS_CORES = {
+  completo:'bg-green-600', atrasado:'bg-yellow-600', saida_antecipada:'bg-orange-600',
+  incompleto:'bg-gray-500', falta:'bg-red-600', falta_justificada:'bg-purple-600',
+  feriado:'bg-blue-500', folga:'bg-slate-500'
+};
+const STATUS_LABEL = {
+  completo:'Completo', atrasado:'Atrasado', saida_antecipada:'Saída antecipada',
+  incompleto:'Incompleto', falta:'Falta', falta_justificada:'Falta justif.',
+  feriado:'Feriado', folga:'Folga'
+};
+let funcId = null;
+
+window.addEventListener("load", async () => {
+  await iniciarCamera(document.getElementById("videoFeed"));
+  resetInactivity(120000, () => { window.location = "/"; });
+});
+
+async function identificarConsulta() {
+  const resp = await reconhecerECapturar("consulta");
+  if (!resp) return;
+
+  funcId = resp.funcionario_id;
+  const foto = resp.foto_perfil
+    ? "/static/" + resp.foto_perfil
+    : "https://ui-avatars.com/api/?name=" + encodeURIComponent(resp.nome) + "&background=1e40af&color=fff";
+
+  document.getElementById("fotoPerfil").src = foto;
+  document.getElementById("nomeFuncionario").textContent = resp.nome;
+  document.getElementById("cargoFuncionario").textContent = resp.cargo || "";
+  document.getElementById("etapaCamera").classList.add("hidden");
+  document.getElementById("etapaDashboard").classList.remove("hidden");
+
+  const mesAtual = new Date().getMonth() + 1;
+  document.getElementById("seletorMes").value = mesAtual;
+  await carregarDados();
+}
+
+async function carregarDados() {
+  const mes = parseInt(document.getElementById("seletorMes").value);
+  const ano = new Date().getFullYear();
+  const resp = await postJSON("/api/dados-funcionario", {funcionario_id: funcId, mes, ano});
+  if (!resp.ok) return;
+
+  document.getElementById("cardTrabalhado").textContent = resp.resumo.total_trabalhado;
+  document.getElementById("cardSaldo").textContent = resp.resumo.saldo;
+  document.getElementById("cardAtrasos").textContent = resp.resumo.atrasos;
+  document.getElementById("cardFaltas").textContent = resp.resumo.faltas;
+
+  document.getElementById("tabelaPontos").innerHTML = resp.dias.map(d => `
+    <tr class="hover:bg-blue-700/40">
+      <td class="px-4 py-2 whitespace-nowrap">${d.data}</td>
+      <td class="px-4 py-2 text-blue-300">${d.dia_semana}</td>
+      <td class="px-4 py-2">${d.entrada}</td>
+      <td class="px-4 py-2">${d.saida}</td>
+      <td class="px-4 py-2">${d.horas}</td>
+      <td class="px-4 py-2 ${d.saldo.startsWith('-') ? 'text-red-400' : 'text-green-400'}">${d.saldo}</td>
+      <td class="px-4 py-2">
+        <span class="px-2 py-0.5 rounded-full text-xs font-medium text-white ${STATUS_CORES[d.status] || 'bg-gray-500'}">
+          ${STATUS_LABEL[d.status] || d.status}
+        </span>
+      </td>
+    </tr>
+  `).join("");
+}
+
+function sair() {
+  pararCamera();
+  window.location = "/";
+}
+</script>
+{% endblock %}
