@@ -1,0 +1,87 @@
+{% extends "base_public.html" %}
+{% block title %}Registrar Ponto{% endblock %}
+{% block content %}
+<div class="min-h-screen flex flex-col items-center justify-center px-4">
+  <div class="bg-blue-800 rounded-3xl p-8 w-full max-w-lg shadow-2xl">
+    <a href="{{ url_for('public.index') }}" class="text-blue-300 text-sm hover:underline mb-4 inline-block">← Voltar</a>
+    <h2 class="text-2xl font-bold text-center mb-6">Registrar Ponto</h2>
+
+    <div id="secaoCamera">
+      <div class="relative">
+        <video id="videoFeed" autoplay playsinline muted
+          class="w-full rounded-2xl bg-black" style="max-height:340px;object-fit:cover;"></video>
+        <div class="face-oval"></div>
+      </div>
+      <p class="text-center text-blue-200 text-sm mt-3">
+        Posicione seu rosto no centro e clique em CAPTURAR
+      </p>
+      <p id="msgReconhecimento" class="text-center mt-2 text-lg min-h-6"></p>
+      <p id="erroCameraMsg" class="hidden text-red-400 text-center mt-3">
+        Erro ao acessar a câmera. Verifique as permissões do navegador.
+      </p>
+    </div>
+
+    <button id="btnCapturar" onclick="executarPonto()"
+      class="mt-5 w-full bg-white text-blue-900 font-bold text-xl py-4 rounded-xl hover:bg-blue-50 transition active:scale-95">
+      CAPTURAR
+    </button>
+
+    <div id="resultadoCaptura" class="hidden mt-6 text-center">
+      <img id="fotoResultado" class="w-24 h-24 rounded-full mx-auto mb-3 object-cover border-4 border-white" src="" alt="">
+      <p id="nomeResultado" class="text-2xl font-bold"></p>
+      <p id="tipoResultado" class="text-blue-200 mt-1 text-lg"></p>
+      <p id="horaResultado" class="text-blue-300 mt-1"></p>
+      <p class="text-green-400 font-semibold mt-3">Ponto registrado com sucesso!</p>
+      <p class="text-blue-400 text-sm mt-2">Fechando em <span id="countdown">5</span>s...</p>
+    </div>
+  </div>
+
+  <p class="mt-6 text-xs text-blue-500 text-center max-w-sm">
+    Dados biométricos tratados conforme a
+    <a href="{{ url_for('public.privacidade') }}" class="underline">LGPD</a>.
+  </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/webcam.js') }}"></script>
+<script>
+window.addEventListener("load", async () => {
+  const video = document.getElementById("videoFeed");
+  const ok = await iniciarCamera(video);
+  if (!ok) {
+    document.getElementById("erroCameraMsg").classList.remove("hidden");
+    document.getElementById("btnCapturar").disabled = true;
+  }
+});
+
+async function executarPonto() {
+  const resp = await reconhecerECapturar("ponto");
+  if (!resp) return;
+
+  document.getElementById("secaoCamera").classList.add("hidden");
+  document.getElementById("btnCapturar").classList.add("hidden");
+
+  const foto = resp.foto_perfil
+    ? "/static/" + resp.foto_perfil
+    : "https://ui-avatars.com/api/?name=" + encodeURIComponent(resp.nome) + "&background=1e40af&color=fff";
+
+  document.getElementById("fotoResultado").src = foto;
+  document.getElementById("nomeResultado").textContent = resp.nome;
+  document.getElementById("tipoResultado").textContent = resp.tipo === "entrada" ? "✅ ENTRADA" : "🚪 SAÍDA";
+  document.getElementById("horaResultado").textContent = resp.data_hora;
+  document.getElementById("resultadoCaptura").classList.remove("hidden");
+
+  let n = 5;
+  const countEl = document.getElementById("countdown");
+  const timer = setInterval(() => {
+    n--;
+    countEl.textContent = n;
+    if (n <= 0) {
+      clearInterval(timer);
+      window.location = "{{ url_for('public.index') }}";
+    }
+  }, 1000);
+}
+</script>
+{% endblock %}
