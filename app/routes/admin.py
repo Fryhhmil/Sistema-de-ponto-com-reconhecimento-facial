@@ -183,3 +183,217 @@ def desativar_funcionario(func_id: int):
     encodings_cache.invalidate(func.id)
     flash(f"Funcionário {func.nome} desativado.", "warning")
     return redirect(url_for("admin.listar_funcionarios"))
+
+
+@admin_bp.route("/pontos")
+def listar_pontos():
+    import calendar
+    from datetime import date
+    page = request.args.get("page", 1, type=int)
+    func_id = request.args.get("funcionario_id", type=int)
+    depto = request.args.get("departamento", "")
+    hoje = date.today()
+    mes = request.args.get("mes", hoje.month, type=int)
+    ano = request.args.get("ano", hoje.year, type=int)
+
+    _, ultimo_dia = calendar.monthrange(ano, mes)
+    data_ini = date(ano, mes, 1)
+    data_fim = date(ano, mes, ultimo_dia)
+
+    q = (Ponto.query.join(Funcionario)
+         .filter(Ponto.data_hora >= data_ini, Ponto.data_hora <= data_fim)
+         .filter(Funcionario.ativo.is_(True)))
+    if func_id:
+        q = q.filter(Ponto.funcionario_id == func_id)
+    if depto:
+        q = q.filter(Funcionario.departamento == depto)
+
+    paginacao = q.order_by(Ponto.data_hora.desc()).paginate(page=page, per_page=20, error_out=False)
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    departamentos = db.session.query(Funcionario.departamento).filter(
+        Funcionario.departamento.isnot(None)).distinct().all()
+
+    return render_template("admin/pontos/lista.html",
+        paginacao=paginacao, func_id=func_id, depto=depto,
+        mes=mes, ano=ano, funcionarios=funcionarios,
+        departamentos=[d[0] for d in departamentos if d[0]])
+
+
+@admin_bp.route("/pontos/<int:ponto_id>/editar", methods=["POST"])
+def editar_ponto(ponto_id: int):
+    ponto = Ponto.query.get_or_404(ponto_id)
+    nova_data_hora_str = request.form.get("data_hora", "")
+    justificativa_txt = request.form.get("justificativa", "").strip()
+
+    if not nova_data_hora_str or not justificativa_txt:
+        flash("Data/hora e justificativa são obrigatórios.", "danger")
+        return redirect(request.referrer or url_for("admin.listar_pontos"))
+
+    try:
+        nova_dt = datetime.strptime(nova_data_hora_str, "%Y-%m-%dT%H:%M")
+    except ValueError:
+        flash("Formato de data/hora inválido.", "danger")
+        return redirect(request.referrer or url_for("admin.listar_pontos"))
+
+    ponto.data_hora_original = ponto.data_hora
+    ponto.data_hora = nova_dt
+    ponto.editado_por_admin = True
+    ponto.justificativa = justificativa_txt
+    db.session.commit()
+
+    db.session.add(AuditLog(usuario_id=current_user.id, acao="editar_ponto",
+        detalhes=json.dumps({"ponto_id": ponto_id,
+                             "data_hora_original": str(ponto.data_hora_original),
+                             "nova_data_hora": str(nova_dt),
+                             "justificativa": justificativa_txt})))
+    db.session.commit()
+
+    flash("Ponto editado com sucesso.", "success")
+    return redirect(request.referrer or url_for("admin.listar_pontos"))
+
+
+@admin_bp.route("/pontos/adicionar", methods=["POST"])
+def adicionar_ponto():
+    func_id = request.form.get("funcionario_id", type=int)
+    tipo = request.form.get("tipo", "")
+    data_hora_str = request.form.get("data_hora", "")
+    justificativa_txt = request.form.get("justificativa", "").strip()
+
+    if not all([func_id, tipo in ("entrada", "saida"), data_hora_str, justificativa_txt]):
+        flash("Todos os campos são obrigatórios.", "danger")
+        return redirect(request.referrer or url_for("admin.listar_pontos"))
+
+    try:
+        data_hora = datetime.strptime(data_hora_str, "%Y-%m-%dT%H:%M")
+    except ValueError:
+        flash("Formato de data/hora inválido.", "danger")
+        return redirect(request.referrer or url_for("admin.listar_pontos"))
+
+    ponto = Ponto(funcionario_id=func_id, tipo=tipo, data_hora=data_hora,
+                  editado_por_admin=True, justificativa=justificativa_txt)
+    db.session.add(ponto)
+    db.session.commit()
+
+    db.session.add(AuditLog(usuario_id=current_user.id, acao="adicionar_ponto_manual",
+        detalhes=json.dumps({"funcionario_id": func_id, "tipo": tipo,
+                             "data_hora": str(data_hora)})))
+    db.session.commit()
+
+    flash("Batida manual adicionada.", "success")
+    return redirect(request.referrer or url_for("admin.listar_pontos"))
+
+
+@admin_bp.route("/pontos/<int:ponto_id>/excluir", methods=["POST"])
+def excluir_ponto(ponto_id: int):
+    ponto = Ponto.query.get_or_404(ponto_id)
+    db.session.add(AuditLog(usuario_id=current_user.id, acao="excluir_ponto",
+        detalhes=json.dumps({"ponto_id": ponto_id, "funcionario_id": ponto.funcionario_id,
+                             "tipo": ponto.tipo, "data_hora": str(ponto.data_hora)})))
+    db.session.delete(ponto)
+    db.session.commit()
+    flash("Batida excluída.", "success")
+    return redirect(request.referrer or url_for("admin.listar_pontos"))
+
+
+@admin_bp.route("/justificativas")
+def listar_justificativas():
+    import calendar
+    from datetime import date
+    hoje = date.today()
+    mes = request.args.get("mes", hoje.month, type=int)
+    ano = request.args.get("ano", hoje.year, type=int)
+    func_id = request.args.get("funcionario_id", type=int)
+
+    _, ultimo_dia = calendar.monthrange(ano, mes)
+    data_ini = date(ano, mes, 1)
+    data_fim = date(ano, mes, ultimo_dia)
+
+    justificativas_q = Justificativa.query.filter(
+        Justificativa.data >= data_ini, Justificativa.data <= data_fim)
+    if func_id:
+        justificativas_q = justificativas_q.filter_by(funcionario_id=func_id)
+    justificativas_list = justificativas_q.order_by(Justificativa.data.desc()).all()
+
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    return render_template("admin/justificativas/lista.html",
+        justificativas=justificativas_list, funcionarios=funcionarios,
+        mes=mes, ano=ano, func_id=func_id)
+
+
+@admin_bp.route("/justificativas/nova", methods=["POST"])
+def nova_justificativa():
+    from datetime import date
+    func_id = request.form.get("funcionario_id", type=int)
+    data_str = request.form.get("data", "")
+    motivo = request.form.get("motivo", "").strip()
+    tipo = request.form.get("tipo", "")
+
+    TIPOS_VALIDOS = {"falta_justificada", "atestado", "folga", "outro"}
+    if not all([func_id, data_str, motivo, tipo in TIPOS_VALIDOS]):
+        flash("Todos os campos são obrigatórios.", "danger")
+        return redirect(request.referrer or url_for("admin.listar_justificativas"))
+
+    try:
+        data = date.fromisoformat(data_str)
+    except ValueError:
+        flash("Data inválida.", "danger")
+        return redirect(request.referrer or url_for("admin.listar_justificativas"))
+
+    Justificativa.query.filter_by(funcionario_id=func_id, data=data).delete()
+    just = Justificativa(funcionario_id=func_id, data=data, motivo=motivo,
+                         tipo=tipo, created_by=current_user.id)
+    db.session.add(just)
+    db.session.commit()
+    flash("Justificativa registrada com sucesso.", "success")
+    return redirect(request.referrer or url_for("admin.listar_justificativas"))
+
+
+@admin_bp.route("/justificativas/<int:just_id>/excluir", methods=["POST"])
+def excluir_justificativa(just_id: int):
+    just = Justificativa.query.get_or_404(just_id)
+    db.session.delete(just)
+    db.session.commit()
+    flash("Justificativa removida.", "success")
+    return redirect(request.referrer or url_for("admin.listar_justificativas"))
+
+
+@admin_bp.route("/feriados")
+def listar_feriados():
+    feriados = Feriado.query.order_by(Feriado.data).all()
+    return render_template("admin/feriados/lista.html", feriados=feriados)
+
+
+@admin_bp.route("/feriados/novo", methods=["POST"])
+def novo_feriado():
+    from datetime import date
+    data_str = request.form.get("data", "")
+    descricao = request.form.get("descricao", "").strip()
+    recorrente = request.form.get("recorrente_anual") == "on"
+
+    if not data_str or not descricao:
+        flash("Data e descrição são obrigatórios.", "danger")
+        return redirect(url_for("admin.listar_feriados"))
+
+    try:
+        data = date.fromisoformat(data_str)
+    except ValueError:
+        flash("Data inválida.", "danger")
+        return redirect(url_for("admin.listar_feriados"))
+
+    if Feriado.query.filter_by(data=data).first():
+        flash("Já existe um feriado nesta data.", "warning")
+        return redirect(url_for("admin.listar_feriados"))
+
+    db.session.add(Feriado(data=data, descricao=descricao, recorrente_anual=recorrente))
+    db.session.commit()
+    flash("Feriado cadastrado.", "success")
+    return redirect(url_for("admin.listar_feriados"))
+
+
+@admin_bp.route("/feriados/<int:feriado_id>/excluir", methods=["POST"])
+def excluir_feriado(feriado_id: int):
+    f = Feriado.query.get_or_404(feriado_id)
+    db.session.delete(f)
+    db.session.commit()
+    flash("Feriado removido.", "success")
+    return redirect(url_for("admin.listar_feriados"))
