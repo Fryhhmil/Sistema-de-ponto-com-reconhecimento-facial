@@ -1,0 +1,126 @@
+{% extends "base_admin.html" %}
+{% block title %}Configurações{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold text-slate-800 mb-6">Configurações</h1>
+
+<div class="space-y-6 max-w-3xl">
+
+  <!-- Card 1: Config Geral -->
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+    <h2 class="text-lg font-semibold text-slate-700 mb-4">Configurações Gerais</h2>
+    <form method="POST" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="acao" value="config">
+
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Nome da Empresa</label>
+          <input type="text" name="nome_empresa" value="{{ cfg.nome_empresa or '' }}"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Dias Úteis (1=Seg, 5=Sex)</label>
+          <input type="text" name="dias_uteis" value="{{ cfg.dias_uteis }}" placeholder="1,2,3,4,5"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Horário Entrada</label>
+          <input type="time" name="horario_entrada"
+            value="{{ cfg.horario_entrada.strftime('%H:%M') if cfg.horario_entrada else '07:00' }}"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Horário Saída</label>
+          <input type="time" name="horario_saida"
+            value="{{ cfg.horario_saida.strftime('%H:%M') if cfg.horario_saida else '17:00' }}"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Tolerância de Atraso (min)</label>
+          <input type="number" name="tolerancia_atraso_min" value="{{ cfg.tolerancia_atraso_min }}" min="0" max="60"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Limite Recuperação (min)</label>
+          <input type="number" name="limite_recuperacao_min" value="{{ cfg.limite_recuperacao_min }}" min="0" max="480"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Threshold Reconhecimento (0.3–1.0)</label>
+          <input type="number" name="threshold_reconhecimento" value="{{ cfg.threshold_reconhecimento }}"
+            step="0.01" min="0.3" max="1.0"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Retenção de Fotos (dias)</label>
+          <input type="number" name="retencao_fotos_dias" value="{{ cfg.retencao_fotos_dias }}" min="1"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+
+      <div class="mb-4 flex items-center gap-2">
+        <input type="checkbox" name="salvar_foto_captura" id="salvar_foto"
+          {{ 'checked' if cfg.salvar_foto_captura }} class="rounded">
+        <label for="salvar_foto" class="text-sm text-slate-700">
+          Salvar foto no momento da captura do ponto (LGPD: requer consentimento explícito)
+        </label>
+      </div>
+
+      <div class="mb-6">
+        <label class="block text-sm font-medium text-slate-700 mb-1">Logo da Empresa</label>
+        {% if cfg.logo_empresa %}
+        <img src="{{ url_for('static', filename=cfg.logo_empresa) }}" class="h-12 mb-2" alt="Logo atual">
+        {% endif %}
+        <input type="file" name="logo_empresa" accept=".jpg,.jpeg,.png,.svg"
+          class="block text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+      </div>
+
+      <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-lg transition">
+        Salvar Configurações
+      </button>
+    </form>
+  </div>
+
+  <!-- Card 2: Alterar Senha -->
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+    <h2 class="text-lg font-semibold text-slate-700 mb-4">Alterar Senha</h2>
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="acao" value="senha">
+      <div class="space-y-3 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Senha Atual</label>
+          <input type="password" name="senha_atual" required autocomplete="current-password"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Nova Senha (mín. 8 caracteres)</label>
+          <input type="password" name="nova_senha" required autocomplete="new-password"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Confirmar Nova Senha</label>
+          <input type="password" name="confirmar_senha" required autocomplete="new-password"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+      <button type="submit" class="bg-slate-700 hover:bg-slate-800 text-white font-semibold px-6 py-2.5 rounded-lg transition">
+        Alterar Senha
+      </button>
+    </form>
+  </div>
+
+  <!-- Card 3: Backup -->
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+    <h2 class="text-lg font-semibold text-slate-700 mb-2">Backup do Banco de Dados</h2>
+    <p class="text-slate-500 text-sm mb-4">
+      Baixe uma cópia completa do banco de dados SQLite com todos os dados de funcionários, pontos e configurações.
+    </p>
+    <a href="{{ url_for('admin.backup') }}"
+      class="inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-700 text-white font-semibold px-6 py-2.5 rounded-lg transition">
+      💾 Baixar ponto.db
+    </a>
+  </div>
+
+</div>
+{% endblock %}

@@ -397,3 +397,247 @@ def excluir_feriado(feriado_id: int):
     db.session.commit()
     flash("Feriado removido.", "success")
     return redirect(url_for("admin.listar_feriados"))
+
+
+@admin_bp.route("/relatorios")
+def relatorios():
+    from datetime import datetime as dt
+    funcionarios = Funcionario.query.filter_by(ativo=True).order_by(Funcionario.nome).all()
+    departamentos = db.session.query(Funcionario.departamento).filter(
+        Funcionario.departamento.isnot(None)).distinct().all()
+    return render_template("admin/relatorios/index.html",
+        funcionarios=funcionarios,
+        departamentos=[d[0] for d in departamentos if d[0]],
+        now=dt.utcnow())
+
+
+@admin_bp.route("/relatorios/pdf")
+def relatorio_pdf():
+    import calendar
+    from datetime import date as dt_date
+    from ..time_service import ConfigSnapshot, calcular_dia, calcular_mes, StatusDia, ResultadoDia
+    from ..report_service import gerar_pdf_espelho
+
+    func_id = request.args.get("funcionario_id", type=int)
+    mes = request.args.get("mes", datetime.utcnow().month, type=int)
+    ano = request.args.get("ano", datetime.utcnow().year, type=int)
+
+    if not func_id:
+        flash("Selecione um funcionário.", "danger")
+        return redirect(url_for("admin.relatorios"))
+
+    func = Funcionario.query.get_or_404(func_id)
+    cfg = ConfigSnapshot.from_model(Configuracao.get())
+    nome_empresa = Configuracao.get().nome_empresa or ""
+
+    _, total_dias = calendar.monthrange(ano, mes)
+    dias_do_mes = [dt_date(ano, mes, d) for d in range(1, total_dias + 1)]
+    dias_uteis_count = sum(1 for d in dias_do_mes if d.isoweekday() in cfg.dias_uteis)
+
+    pontos_mes = (Ponto.query
+        .filter(Ponto.funcionario_id == func_id,
+                db.extract("month", Ponto.data_hora) == mes,
+                db.extract("year", Ponto.data_hora) == ano)
+        .order_by(Ponto.data_hora).all())
+
+    pontos_por_dia = {}
+    for p in pontos_mes:
+        pontos_por_dia.setdefault(p.data_hora.date(), []).append(p)
+
+    feriados_set = {f.data for f in Feriado.query.filter(
+        db.extract("month", Feriado.data) == mes,
+        db.extract("year", Feriado.data) == ano).all()}
+    for fr in Feriado.query.filter_by(recorrente_anual=True).all():
+        try:
+            feriados_set.add(dt_date(ano, fr.data.month, fr.data.day))
+        except ValueError:
+            pass
+
+    just_por_dia = {j.data: j.tipo for j in Justificativa.query.filter(
+        Justificativa.funcionario_id == func_id,
+        db.extract("month", Justificativa.data) == mes,
+        db.extract("year", Justificativa.data) == ano).all()}
+
+    resultados = []
+    for dia in dias_do_mes:
+        if dia.isoweekday() not in cfg.dias_uteis:
+            resultados.append(ResultadoDia(data=dia, entrada=None, saida=None,
+                horas_trabalhadas_min=0, saldo_min=0, atraso_min=0,
+                recuperado_min=0, status=StatusDia.FOLGA))
+            continue
+        ps = pontos_por_dia.get(dia, [])
+        entradas = [p.data_hora for p in ps if p.tipo == "entrada"]
+        saidas = [p.data_hora for p in ps if p.tipo == "saida"]
+        resultados.append(calcular_dia(
+            entrada=entradas[0] if entradas else None,
+            saida=saidas[-1] if saidas else None,
+            cfg=cfg, feriado=dia in feriados_set,
+            justificativa=just_por_dia.get(dia), data=dia))
+
+    resumo = calcular_mes(resultados, dias_uteis_count)
+    pdf_bytes = gerar_pdf_espelho(func, resultados, resumo, mes, ano, nome_empresa)
+
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"espelho_{func.matricula}_{mes:02d}_{ano}.pdf",
+    )
+
+
+@admin_bp.route("/relatorios/excel")
+def relatorio_excel():
+    import calendar
+    from datetime import date as dt_date
+    from ..time_service import ConfigSnapshot, calcular_dia, calcular_mes, StatusDia, ResultadoDia
+    from ..report_service import gerar_excel_consolidado
+
+    mes = request.args.get("mes", datetime.utcnow().month, type=int)
+    ano = request.args.get("ano", datetime.utcnow().year, type=int)
+    depto = request.args.get("departamento", "")
+
+    cfg = ConfigSnapshot.from_model(Configuracao.get())
+    nome_empresa = Configuracao.get().nome_empresa or ""
+    _, total_dias = calendar.monthrange(ano, mes)
+    dias_do_mes = [dt_date(ano, mes, d) for d in range(1, total_dias + 1)]
+    dias_uteis_count = sum(1 for d in dias_do_mes if d.isoweekday() in cfg.dias_uteis)
+
+    feriados_db = Feriado.query.filter(
+        db.extract("month", Feriado.data) == mes,
+        db.extract("year", Feriado.data) == ano).all()
+    feriados_set = {f.data for f in feriados_db}
+    for fr in Feriado.query.filter_by(recorrente_anual=True).all():
+        try:
+            feriados_set.add(dt_date(ano, fr.data.month, fr.data.day))
+        except ValueError:
+            pass
+
+    q = Funcionario.query.filter_by(ativo=True)
+    if depto:
+        q = q.filter_by(departamento=depto)
+    funcionarios = q.order_by(Funcionario.nome).all()
+
+    dados_consolidados = []
+    for func in funcionarios:
+        pontos_mes = (Ponto.query
+            .filter(Ponto.funcionario_id == func.id,
+                    db.extract("month", Ponto.data_hora) == mes,
+                    db.extract("year", Ponto.data_hora) == ano)
+            .order_by(Ponto.data_hora).all())
+
+        pontos_por_dia = {}
+        for p in pontos_mes:
+            pontos_por_dia.setdefault(p.data_hora.date(), []).append(p)
+
+        just_por_dia = {j.data: j.tipo for j in Justificativa.query.filter(
+            Justificativa.funcionario_id == func.id,
+            db.extract("month", Justificativa.data) == mes,
+            db.extract("year", Justificativa.data) == ano).all()}
+
+        resultados = []
+        for dia in dias_do_mes:
+            if dia.isoweekday() not in cfg.dias_uteis:
+                resultados.append(ResultadoDia(data=dia, entrada=None, saida=None,
+                    horas_trabalhadas_min=0, saldo_min=0, atraso_min=0,
+                    recuperado_min=0, status=StatusDia.FOLGA))
+                continue
+            ps = pontos_por_dia.get(dia, [])
+            entradas = [p.data_hora for p in ps if p.tipo == "entrada"]
+            saidas = [p.data_hora for p in ps if p.tipo == "saida"]
+            resultados.append(calcular_dia(
+                entrada=entradas[0] if entradas else None,
+                saida=saidas[-1] if saidas else None,
+                cfg=cfg, feriado=dia in feriados_set,
+                justificativa=just_por_dia.get(dia), data=dia))
+
+        resumo = calcular_mes(resultados, dias_uteis_count)
+        dias_trab = sum(1 for r in resultados if r.horas_trabalhadas_min > 0)
+        dados_consolidados.append({
+            "matricula": func.matricula, "nome": func.nome,
+            "departamento": func.departamento or "",
+            "dias_trabalhados": dias_trab,
+            "total_trabalhado_min": resumo.total_trabalhado_min,
+            "total_previsto_min": resumo.total_previsto_min,
+            "saldo_min": resumo.saldo_min,
+            "atrasos": resumo.atrasos, "faltas": resumo.faltas,
+            "faltas_justificadas": resumo.faltas_justificadas,
+        })
+
+    excel_bytes = gerar_excel_consolidado(dados_consolidados, mes, ano, nome_empresa, feriados_db)
+    return send_file(
+        io.BytesIO(excel_bytes),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=f"consolidado_{mes:02d}_{ano}.xlsx",
+    )
+
+
+@admin_bp.route("/configuracoes", methods=["GET", "POST"])
+def configuracoes():
+    from datetime import time as dtime
+    cfg = Configuracao.get()
+
+    if request.method == "POST":
+        acao = request.form.get("acao", "config")
+
+        if acao == "config":
+            def parse_time(s: str):
+                try:
+                    h, m = map(int, s.split(":"))
+                    return dtime(h, m)
+                except Exception:
+                    return None
+
+            he = parse_time(request.form.get("horario_entrada", "07:00"))
+            hs = parse_time(request.form.get("horario_saida", "17:00"))
+            if he:
+                cfg.horario_entrada = he
+            if hs:
+                cfg.horario_saida = hs
+            cfg.tolerancia_atraso_min = int(request.form.get("tolerancia_atraso_min", 10))
+            cfg.limite_recuperacao_min = int(request.form.get("limite_recuperacao_min", 120))
+            cfg.dias_uteis = request.form.get("dias_uteis", "1,2,3,4,5")
+            cfg.nome_empresa = request.form.get("nome_empresa", "").strip()
+            cfg.threshold_reconhecimento = float(request.form.get("threshold_reconhecimento", 0.6))
+            cfg.salvar_foto_captura = request.form.get("salvar_foto_captura") == "on"
+            cfg.retencao_fotos_dias = int(request.form.get("retencao_fotos_dias", 30))
+
+            logo = request.files.get("logo_empresa")
+            if logo and logo.filename:
+                from ..utils.helpers import allowed_file, save_upload
+                from flask import current_app
+                if allowed_file(logo.filename, current_app.config["ALLOWED_LOGO_EXTENSIONS"]):
+                    cfg.logo_empresa = save_upload(logo, "logo")
+
+            db.session.commit()
+            flash("Configurações salvas.", "success")
+
+        elif acao == "senha":
+            senha_atual = request.form.get("senha_atual", "")
+            nova = request.form.get("nova_senha", "")
+            confirmar = request.form.get("confirmar_senha", "")
+            if not current_user.check_password(senha_atual):
+                flash("Senha atual incorreta.", "danger")
+            elif len(nova) < 8:
+                flash("Nova senha deve ter no mínimo 8 caracteres.", "danger")
+            elif nova != confirmar:
+                flash("As senhas não coincidem.", "danger")
+            else:
+                current_user.set_password(nova)
+                db.session.commit()
+                flash("Senha alterada com sucesso.", "success")
+
+        return redirect(url_for("admin.configuracoes"))
+
+    return render_template("admin/configuracoes/index.html", cfg=cfg)
+
+
+@admin_bp.route("/configuracoes/backup")
+def backup():
+    import os
+    from flask import current_app
+    db_path = os.path.join(current_app.instance_path, "ponto.db")
+    hoje = datetime.utcnow().strftime("%Y-%m-%d")
+    return send_file(db_path, as_attachment=True,
+                     download_name=f"ponto_backup_{hoje}.db",
+                     mimetype="application/octet-stream")

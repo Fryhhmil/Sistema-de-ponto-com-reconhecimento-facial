@@ -1,0 +1,83 @@
+{% extends "base_admin.html" %}
+{% block title %}Relatórios{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold text-slate-800 mb-6">Relatórios</h1>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+  <!-- PDF Individual -->
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+    <h2 class="text-lg font-semibold text-slate-700 mb-1">Espelho de Ponto Individual</h2>
+    <p class="text-slate-500 text-sm mb-4">Gera PDF com o espelho mensal de um funcionário.</p>
+    <form method="GET" action="{{ url_for('admin.relatorio_pdf') }}">
+      <div class="mb-3">
+        <label class="block text-sm font-medium text-slate-700 mb-1">Funcionário *</label>
+        <select name="funcionario_id" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">Selecione...</option>
+          {% for f in funcionarios %}
+          <option value="{{ f.id }}">{{ f.nome }} ({{ f.matricula }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Mês</label>
+          <select name="mes" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            {% set meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] %}
+            {% for nome_mes in meses %}
+            <option value="{{ loop.index }}">{{ nome_mes }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Ano</label>
+          <input type="number" name="ano" value="{{ now.year if now else 2025 }}" min="2020" max="2099"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
+      <button type="submit"
+        class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-lg transition flex items-center justify-center gap-2">
+        📄 Baixar PDF
+      </button>
+    </form>
+  </div>
+
+  <!-- Excel Consolidado -->
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+    <h2 class="text-lg font-semibold text-slate-700 mb-1">Relatório Consolidado Mensal</h2>
+    <p class="text-slate-500 text-sm mb-4">Gera Excel com resumo de todos os funcionários no mês.</p>
+    <form method="GET" action="{{ url_for('admin.relatorio_excel') }}">
+      <div class="mb-3">
+        <label class="block text-sm font-medium text-slate-700 mb-1">Departamento (opcional)</label>
+        <select name="departamento" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          <option value="">Todos os departamentos</option>
+          {% for d in departamentos %}
+          <option value="{{ d }}">{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Mês</label>
+          <select name="mes" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            {% set meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] %}
+            {% for nome_mes in meses %}
+            <option value="{{ loop.index }}">{{ nome_mes }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Ano</label>
+          <input type="number" name="ano" value="{{ now.year if now else 2025 }}" min="2020" max="2099"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+      </div>
+      <button type="submit"
+        class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-lg transition flex items-center justify-center gap-2">
+        📊 Baixar Excel
+      </button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
