@@ -1,0 +1,108 @@
+{% extends "base_admin.html" %}
+{% block title %}Cadastro Facial — {{ func.nome }}{% endblock %}
+{% block content %}
+<div class="max-w-3xl">
+  <h1 class="text-2xl font-bold text-slate-800 mb-2">Cadastro Facial — {{ func.nome }}</h1>
+  <p class="text-slate-500 text-sm mb-6">Capture 5 fotos nos ângulos indicados para melhor reconhecimento.</p>
+
+  <!-- 5 photo slots -->
+  <div class="grid grid-cols-5 gap-3 mb-6">
+    {% for i, angulo in [(1,'Frente'),(2,'Esq. ~15°'),(3,'Dir. ~15°'),(4,'Cima ~15°'),(5,'Baixo ~15°')] %}
+    <div id="slot_{{ i }}" class="border-2 border-dashed border-slate-300 rounded-xl p-3 text-center bg-white">
+      <div class="h-16 flex items-center justify-center text-slate-400 text-xs font-medium">{{ angulo }}</div>
+      <canvas id="preview_{{ i }}" class="hidden w-full rounded mt-1" height="80"></canvas>
+      <p class="text-xs mt-1 text-slate-500">Foto {{ i }}</p>
+      <span id="check_{{ i }}" class="hidden text-green-600 text-xl font-bold">✓</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Camera -->
+  <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4">
+    <div class="relative">
+      <video id="videoFeed" autoplay playsinline muted
+        class="w-full rounded-xl bg-black" style="max-height:300px;object-fit:cover;"></video>
+      <div class="face-oval"></div>
+    </div>
+  </div>
+
+  <p id="instrucaoAtual" class="text-center text-slate-600 mb-4 font-medium">
+    Foto 1: Olhe diretamente para a câmera
+  </p>
+
+  <button id="btnCapturarFoto" onclick="capturarFotoSlot()"
+    class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition">
+    CAPTURAR FOTO 1
+  </button>
+  <button id="btnFinalizar" onclick="finalizarCadastro()" disabled
+    class="mt-3 w-full bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+    FINALIZAR CADASTRO
+  </button>
+  <a href="{{ url_for('admin.listar_funcionarios') }}"
+    class="mt-3 block text-center text-slate-500 hover:underline text-sm">
+    Pular por agora (cadastrar fotos depois)
+  </a>
+  <p id="msgFotos" class="text-center mt-3 text-red-600 font-medium min-h-5"></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/webcam.js') }}"></script>
+<script>
+const INSTRUCOES = [
+  "", "Olhe diretamente para a câmera", "Vire levemente à esquerda (~15°)",
+  "Vire levemente à direita (~15°)", "Incline levemente para cima", "Incline levemente para baixo"
+];
+const fotos = {};
+let slotAtual = 1;
+
+window.addEventListener("load", async () => {
+  await iniciarCamera(document.getElementById("videoFeed"));
+});
+
+function capturarFotoSlot() {
+  const video = document.getElementById("videoFeed");
+  triggerFlash();
+  const b64 = capturarFrame(video);
+  fotos[`foto_${slotAtual}`] = b64;
+
+  const canvas = document.getElementById(`preview_${slotAtual}`);
+  const ctx = canvas.getContext("2d");
+  const img = new Image();
+  img.src = b64;
+  img.onload = () => {
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
+  };
+  canvas.classList.remove("hidden");
+  document.getElementById(`check_${slotAtual}`).classList.remove("hidden");
+  document.getElementById(`slot_${slotAtual}`).classList.remove("border-dashed");
+  document.getElementById(`slot_${slotAtual}`).classList.add("border-green-400", "border-solid");
+
+  slotAtual++;
+  if (slotAtual <= 5) {
+    document.getElementById("btnCapturarFoto").textContent = `CAPTURAR FOTO ${slotAtual}`;
+    document.getElementById("instrucaoAtual").textContent = `Foto ${slotAtual}: ${INSTRUCOES[slotAtual]}`;
+  } else {
+    document.getElementById("btnCapturarFoto").disabled = true;
+    document.getElementById("btnCapturarFoto").textContent = "Todas as fotos capturadas";
+    document.getElementById("btnFinalizar").disabled = false;
+  }
+}
+
+async function finalizarCadastro() {
+  const btn = document.getElementById("btnFinalizar");
+  btn.disabled = true;
+  btn.textContent = "Processando...";
+  const resp = await postJSON("/admin/funcionarios/{{ func.id }}/fotos", fotos);
+  if (resp.ok) {
+    window.location = resp.redirect;
+  } else {
+    document.getElementById("msgFotos").textContent = resp.erro;
+    btn.disabled = false;
+    btn.textContent = "FINALIZAR CADASTRO";
+  }
+}
+</script>
+{% endblock %}

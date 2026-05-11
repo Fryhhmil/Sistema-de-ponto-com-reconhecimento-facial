@@ -1,0 +1,97 @@
+{% extends "base_admin.html" %}
+{% block title %}Funcionários{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold text-slate-800">Funcionários</h1>
+  <a href="{{ url_for('admin.novo_funcionario') }}"
+    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg text-sm transition">
+    + Novo Funcionário
+  </a>
+</div>
+
+<!-- Filters -->
+<form method="GET" class="bg-white rounded-xl p-4 shadow-sm border border-slate-100 mb-6 flex flex-wrap gap-3">
+  <input type="text" name="q" value="{{ busca }}" placeholder="Buscar nome ou matrícula"
+    class="border border-slate-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-40 focus:outline-none focus:ring-2 focus:ring-blue-500">
+  <select name="departamento" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+    <option value="">Todos departamentos</option>
+    {% for d in departamentos %}
+    <option value="{{ d }}" {{ 'selected' if depto == d }}>{{ d }}</option>
+    {% endfor %}
+  </select>
+  <select name="status" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+    <option value="ativo" {{ 'selected' if status == 'ativo' }}>Ativos</option>
+    <option value="inativo" {{ 'selected' if status == 'inativo' }}>Inativos</option>
+    <option value="todos" {{ 'selected' if status == 'todos' }}>Todos</option>
+  </select>
+  <button type="submit" class="bg-slate-600 text-white px-4 py-2 rounded-lg text-sm">Filtrar</button>
+</form>
+
+<!-- Table -->
+<div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="text-xs text-slate-500 uppercase bg-slate-50">
+      <tr>
+        <th class="px-6 py-3 text-left">Matrícula</th>
+        <th class="px-6 py-3 text-left">Nome</th>
+        <th class="px-6 py-3 text-left">Cargo</th>
+        <th class="px-6 py-3 text-left">Departamento</th>
+        <th class="px-6 py-3 text-left">Admissão</th>
+        <th class="px-6 py-3 text-left">Status</th>
+        <th class="px-6 py-3 text-left">Ações</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for f in paginacao.items %}
+      <tr class="hover:bg-slate-50">
+        <td class="px-6 py-3 font-mono text-slate-600">{{ f.matricula }}</td>
+        <td class="px-6 py-3 font-medium">{{ f.nome }}</td>
+        <td class="px-6 py-3 text-slate-600">{{ f.cargo or '—' }}</td>
+        <td class="px-6 py-3 text-slate-600">{{ f.departamento or '—' }}</td>
+        <td class="px-6 py-3 text-slate-600">{{ f.data_admissao.strftime('%d/%m/%Y') if f.data_admissao else '—' }}</td>
+        <td class="px-6 py-3">
+          <span class="px-2 py-0.5 rounded-full text-xs font-medium
+            {{ 'bg-green-100 text-green-800' if f.ativo else 'bg-red-100 text-red-800' }}">
+            {{ 'Ativo' if f.ativo else 'Inativo' }}
+          </span>
+        </td>
+        <td class="px-6 py-3">
+          <div class="flex gap-2">
+            <a href="{{ url_for('admin.editar_funcionario', func_id=f.id) }}"
+              class="text-blue-600 hover:underline text-xs">Editar</a>
+            <a href="{{ url_for('admin.fotos_funcionario', func_id=f.id) }}"
+              class="text-purple-600 hover:underline text-xs">Fotos</a>
+            {% if f.ativo %}
+            <form method="POST" action="{{ url_for('admin.desativar_funcionario', func_id=f.id) }}" class="inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="text-red-600 hover:underline text-xs"
+                data-confirm="Desativar {{ f.nome }}? Esta ação pode ser revertida editando o funcionário.">
+                Desativar
+              </button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="px-6 py-4 text-center text-slate-400">Nenhum funcionário encontrado.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if paginacao.pages > 1 %}
+<div class="flex gap-2 mt-4 justify-center">
+  {% if paginacao.has_prev %}
+  <a href="?page={{ paginacao.prev_num }}&q={{ busca }}&departamento={{ depto }}&status={{ status }}"
+    class="px-3 py-1 border rounded text-sm hover:bg-slate-50">← Anterior</a>
+  {% endif %}
+  <span class="px-3 py-1 text-sm text-slate-500">{{ paginacao.page }}/{{ paginacao.pages }}</span>
+  {% if paginacao.has_next %}
+  <a href="?page={{ paginacao.next_num }}&q={{ busca }}&departamento={{ depto }}&status={{ status }}"
+    class="px-3 py-1 border rounded text-sm hover:bg-slate-50">Próxima →</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
