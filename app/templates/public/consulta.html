@@ -96,7 +96,7 @@ async function identificarConsulta() {
 
   funcId = resp.funcionario_id;
   const foto = resp.foto_perfil
-    ? "/static/" + resp.foto_perfil
+    ? "/uploads/" + resp.foto_perfil.replace(/\\/g, "/")
     : "https://ui-avatars.com/api/?name=" + encodeURIComponent(resp.nome) + "&background=1e40af&color=fff";
 
   document.getElementById("fotoPerfil").src = foto;

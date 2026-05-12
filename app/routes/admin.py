@@ -458,8 +458,14 @@ def relatorio_pdf():
         db.extract("month", Justificativa.data) == mes,
         db.extract("year", Justificativa.data) == ano).all()}
 
+    agora_local = datetime.now()
+    hoje_local = agora_local.date()
     resultados = []
     for dia in dias_do_mes:
+        if dia > hoje_local or (dia == hoje_local and agora_local.time() < cfg.horario_entrada):
+            continue
+        if func.data_admissao and dia < func.data_admissao:
+            continue
         if dia.isoweekday() not in cfg.dias_uteis:
             resultados.append(ResultadoDia(data=dia, entrada=None, saida=None,
                 horas_trabalhadas_min=0, saldo_min=0, atraso_min=0,
@@ -517,6 +523,8 @@ def relatorio_excel():
         q = q.filter_by(departamento=depto)
     funcionarios = q.order_by(Funcionario.nome).all()
 
+    agora_local = datetime.now()
+    hoje_local = agora_local.date()
     dados_consolidados = []
     for func in funcionarios:
         pontos_mes = (Ponto.query
@@ -536,6 +544,10 @@ def relatorio_excel():
 
         resultados = []
         for dia in dias_do_mes:
+            if dia > hoje_local or (dia == hoje_local and agora_local.time() < cfg.horario_entrada):
+                continue
+            if func.data_admissao and dia < func.data_admissao:
+                continue
             if dia.isoweekday() not in cfg.dias_uteis:
                 resultados.append(ResultadoDia(data=dia, entrada=None, saida=None,
                     horas_trabalhadas_min=0, saldo_min=0, atraso_min=0,

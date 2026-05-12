@@ -15,7 +15,7 @@ def save_upload(file, subfolder: str = "fotos") -> str:
     folder = os.path.join(current_app.root_path, "..", "instance", "uploads", subfolder)
     os.makedirs(folder, exist_ok=True)
     file.save(os.path.join(folder, filename))
-    return os.path.join("uploads", subfolder, filename)
+    return f"uploads/{subfolder}/{filename}"
 
 
 def paginate_query(query, page: int, per_page: int = 20):
@@ -36,6 +36,6 @@ def _salvar_foto_captura(base64_str: str, agora) -> str | None:
         fname = f"{uuid.uuid4().hex}.jpg"
         with open(os.path.join(folder, fname), "wb") as f:
             f.write(img_bytes)
-        return os.path.join("uploads", subfolder, fname)
+        return f"uploads/{subfolder}/{fname}"
     except Exception:
         return None

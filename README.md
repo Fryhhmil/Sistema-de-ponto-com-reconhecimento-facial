@@ -4,7 +4,7 @@ Aplicação Flask para controle de ponto via reconhecimento facial. Modo totem/q
 
 ## Pré-requisitos
 
-- Python 3.11+
+- Python 3.10
 - CMake (necessário para compilar dlib no Windows)
 - Visual Studio Build Tools 2022 com "Desenvolvimento para desktop com C++"
 

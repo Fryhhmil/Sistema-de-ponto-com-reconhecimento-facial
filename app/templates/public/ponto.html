@@ -63,7 +63,7 @@ async function executarPonto() {
   document.getElementById("btnCapturar").classList.add("hidden");
 
   const foto = resp.foto_perfil
-    ? "/static/" + resp.foto_perfil
+    ? "/uploads/" + resp.foto_perfil.replace(/\\/g, "/")
     : "https://ui-avatars.com/api/?name=" + encodeURIComponent(resp.nome) + "&background=1e40af&color=fff";
 
   document.getElementById("fotoResultado").src = foto;
