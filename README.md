@@ -4,7 +4,7 @@ Aplicação Flask para controle de ponto via reconhecimento facial. Modo totem/q
 
 ## Pré-requisitos
 
-- Python 3.10
+- Python 3.10.11
 - CMake (necessário para compilar dlib no Windows)
 - Visual Studio Build Tools 2022 com "Desenvolvimento para desktop com C++"
 
@@ -76,6 +76,59 @@ python run.py
 flask seed
 # Cria: admin/admin123 + 3 funcionários de teste (sem encoding facial)
 ```
+
+## Docker
+
+### Build
+
+```bash
+docker build -t barradas:latest .
+```
+
+> O build compila o dlib do zero — pode levar 5–15 minutos na primeira vez.
+
+### Executar
+
+```bash
+docker run -d \
+  --name barradas \
+  -p 8000:8000 \
+  -v "$PWD/instance:/app/instance" \
+  -e SECRET_KEY=troque-por-uma-chave-aleatoria-segura \
+  barradas:latest
+```
+
+| Parâmetro | O que faz |
+|-----------|-----------|
+| `-p 8000:8000` | Expõe a aplicação na porta 8000 do host |
+| `-v "$PWD/instance:/app/instance"` | Persiste banco de dados e uploads entre restarts |
+| `-e SECRET_KEY=...` | Chave secreta Flask — **obrigatório trocar em produção** |
+
+O container roda `flask db upgrade` automaticamente na primeira inicialização.
+
+### Criar administrador inicial
+
+```bash
+docker exec -it barradas flask criar-admin
+```
+
+### Acessar
+
+| URL | Descrição |
+|-----|-----------|
+| `http://localhost:8000/` | Tela inicial (totem) |
+| `http://localhost:8000/ponto` | Registro de ponto por reconhecimento facial |
+| `http://localhost:8000/consulta` | Consulta de dados pelo funcionário |
+| `http://localhost:8000/admin` | Painel administrativo |
+
+### Parar / remover
+
+```bash
+docker stop barradas
+docker rm barradas
+```
+
+---
 
 ## Backup
 
